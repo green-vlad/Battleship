@@ -1,0 +1,18 @@
+.gradle
+.idea
+gradle
+Topics
+build.gradle
+course-info.yaml
+course-remote-info.yaml
+gradlew
+gradlew.bat
+settings.gradle
+Battleship/Fog of war/
+Battleship/Friend or foe/
+Battleship/Take position/
+Battleship/The end of the war/
+Battleship/The first shot/
+Battleship/lesson-info.yaml
+Battleship/task/out/
+Battleship/task/test/
