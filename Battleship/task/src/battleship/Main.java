@@ -8,45 +8,46 @@ import java.util.regex.Pattern;
 public class Main {
 
     public static void main(String[] args) {
-        Scanner scanner = new Scanner(System.in);
         BattleField battleField = new BattleField();
-        battleField.drawBattleField();
-        String input;
-        boolean stop = false;
-        while (!stop) {
-            input = scanner.nextLine();
-            if ("stop".equals(input)) {
-                stop = true;
-            } else {
-                try {
-                    Parser parser = new Parser();
+        AbstractBattleship[] fleet = new AbstractBattleship[5];
+        fleet[0] = new AircraftCarrier();
+        fleet[1] = new Battleship();
+        fleet[2] = new Submarine();
+        fleet[3] = new Cruiser();
+        fleet[4] = new Destroyer();
+        placeFleet(battleField, fleet);
 
-
-                    Coordinates[] shipCoords = parser.parseCoordinates(input.toUpperCase());
-                    Battleship aircraftcarrier = new AircraftCarrierBattleShip();
-                    aircraftcarrier.setCoordinates(shipCoords[0], shipCoords[1]);
-                    battleField.addBattleShip(aircraftcarrier);
-                    battleField.drawBattleField();
-
-                } catch (IllegalArgumentException e) {
-                    System.out.println(e.getMessage());
-                }
-            }
-        }
     }
 
-    private static void placeFleet(BattleField battleField, Battleship[] fleet) {
+    private static void placeFleet(BattleField battleField, AbstractBattleship[] fleet) {
         Scanner scanner = new Scanner(System.in);
         Parser parser = new Parser();
         String input;
         for (int i = 0; i < fleet.length; i++) {
-            System.out.printf("Enter the coordinates of the %s (%d cells):", fleet[i].getBattleshipType(), fleet[i].length);
-            input = scanner.nextLine();
-            Coordinates[] shipCoords = parser.parseCoordinates(input.toUpperCase());
-            fleet[i].setCoordinates(shipCoords[0], shipCoords[1]);
-            battleField.addBattleShip(fleet[i]);
             battleField.drawBattleField();
+            System.out.printf("Enter the coordinates of the %s (%d cells):\r\n", fleet[i].getBattleshipType(), fleet[i].length);
+            boolean stop = false;
+            while (!stop) {
+                try {
+                    input = scanner.nextLine();
+                    Coordinates[] shipCoords = parser.parseCoordinates(input.toUpperCase());
+                    if (shipCoords[0].getX() == shipCoords[1].getX() &&
+                        shipCoords[0].getY() > shipCoords[1].getY() ||
+                        shipCoords[0].getY() == shipCoords[1].getY() &&
+                        shipCoords[0].getX() > shipCoords[1].getX()) {
+                        fleet[i].setCoordinates(shipCoords[1], shipCoords[0]);
+                    } else {
+                        fleet[i].setCoordinates(shipCoords[0], shipCoords[1]);
+                    }
+                    battleField.addBattleShip(fleet[i]);
+//                    battleField.drawBattleField();
+                    stop = true;
+                } catch (IllegalArgumentException e) {
+                    System.out.println(e.getMessage() + " Try again:");
+                }
+            }
         }
+        battleField.drawBattleField();
     }
 }
 
@@ -139,7 +140,7 @@ class BattleField {
         }
     }
 
-    private void addPadding(Battleship battleship) {
+    private void addPadding(AbstractBattleship battleship) {
         Coordinates[] coords = battleship.getCoordinates();
         boolean isHorizontal = true;
         isHorizontal = coords[0].getY() == coords[coords.length - 1].getY();
@@ -185,11 +186,13 @@ class BattleField {
             }
         }
     }
-    public void addBattleShip(Battleship battleship) {
+    public void addBattleShip(AbstractBattleship battleship) {
         Coordinates[] coords = battleship.getCoordinates();
         for (int i = 0; i < coords.length; i++) {
             if (map[coords[i].getY()][coords[i].getX()] == '·') {
-                throw new IllegalArgumentException("Error! Wrong coordinates! Too close to the other ship.");
+                throw new IllegalArgumentException("Error! Wrong coordinates! Too close to other ship.");
+            } else if (map[coords[i].getY()][coords[i].getX()] == 'O') {
+                throw new IllegalArgumentException("Error! Wrong coordinates! Overlapping with other ship.");
             }
             map[coords[i].getY()][coords[i].getX()] = 'O';
         }
@@ -202,19 +205,23 @@ class BattleField {
         for (int i = 0; i < map.length; i++) {
             System.out.print(letters[i]);
             for (int j = 0; j < map[i].length; j++) {
-                System.out.print(" " + map[i][j]);
+                if (map[i][j] == '·') {
+                    System.out.print(" ~");
+                } else {
+                    System.out.print(" " + map[i][j]);
+                }
             }
             System.out.print("\r\n");
         }
     }
 }
-abstract class Battleship {
+abstract class AbstractBattleship {
 
     protected Coordinates[] coordinates;
 
     protected int length;
 
-    protected Battleship(int length) {
+    protected AbstractBattleship(int length) {
         this.length = length;
         coordinates = new Coordinates[length];
     }
@@ -264,8 +271,37 @@ abstract class Battleship {
     }
 }
 
-class AircraftCarrierBattleShip extends Battleship {
-    public AircraftCarrierBattleShip() {
+class AircraftCarrier extends AbstractBattleship {
+    public AircraftCarrier() {
         super(5);
+    }
+}
+
+class Battleship extends AbstractBattleship {
+    public Battleship() {
+        super(4);
+    }
+}
+
+class Submarine extends AbstractBattleship {
+    public Submarine() {
+        super(3);
+    }
+}
+
+class Cruiser extends AbstractBattleship {
+    public Cruiser() {
+        super(3);
+    }
+
+    @Override
+    public String getBattleshipType() {
+        return "Cruiser";
+    }
+}
+
+class Destroyer extends AbstractBattleship {
+    public Destroyer() {
+        super(2);
     }
 }
