@@ -1,6 +1,8 @@
 package battleship;
 
+import java.io.IOException;
 import java.lang.Math;
+import java.util.ArrayList;
 import java.util.Scanner;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -8,28 +10,102 @@ import java.util.regex.Pattern;
 public class Main {
 
     public static void main(String[] args) {
-        BattleField battleField = new BattleField();
-        AbstractBattleship[] fleet = new AbstractBattleship[5];
-        fleet[0] = new AircraftCarrier();
-        fleet[1] = new Battleship();
-        fleet[2] = new Submarine();
-        fleet[3] = new Cruiser();
-        fleet[4] = new Destroyer();
-        placeFleet(battleField, fleet);
+        BattleField battleField1 = new BattleField();
+        BattleField battleField2 = new BattleField();
+        Player player1 = new Player(battleField1, "Player 1");
+        Player player2 = new Player(battleField2, "Player 2");
 
+        System.out.println("Player 1, place your ships on the game field");
+        placeFleet(battleField1, player1.getFleet());
+
+        switchPlayers();
+
+        System.out.println("Player 2, place your ships on the game field");
+        placeFleet(battleField2, player2.getFleet());
+
+        switchPlayers();
+
+        placeAshot(player1, player2);
     }
 
+    private static void switchPlayers () {
+        int inChar;
+        System.out.println("Press Enter and pass the move to another player");
+        try {
+            inChar = System.in.read();
+            while (inChar != 10) {
+                inChar = System.in.read();
+                System.out.println(inChar);
+            }
+            System.out.println("...");
+        }
+        catch (IOException e){
+            System.out.println("Error reading from user");
+        }
+    }
+    private static void placeAshot(Player player1, Player player2) {
+        Player active = player1;
+        Player passive = player2;
+        Scanner scanner = new Scanner(System.in);
+        Parser parser = new Parser();
+        String input;
+        System.out.println();
+        boolean stop = false;
+        while (!stop) {
+            passive.getBattleField().setFogOfWarOn(true);
+            passive.getBattleField().drawBattleField();
+            System.out.println("---------------------");
+            active.getBattleField().setFogOfWarOn(false);
+            active.getBattleField().drawBattleField();
+            System.out.println();
+            System.out.println(active.getPlayerName() + ", it's your turn:");
+            System.out.println();
+
+
+            input = scanner.nextLine();
+            System.out.println();
+            try {
+                Coordinates coords = parser.getDecodedCoordinate(input.toUpperCase());
+                if (passive.getBattleField().isHit(coords)) {
+                    passive.getBattleField().drawBattleField();
+                    AbstractBattleship ship = passive.getBattleField().getBattleShipByCoords(coords);
+                    if (!ship.isAfloat(passive.getBattleField())) {
+                        if (passive.getBattleField().isAnyoneAfloat()) {
+                            System.out.println("You sank a ship!");
+                            switchPlayers();
+                        } else {
+                            System.out.println("You sank the last ship. You won. Congratulations!");
+                            stop = true;
+                        }
+                    } else {
+                        System.out.println("You hit a ship!");
+                        switchPlayers();
+                    }
+                } else {
+                    passive.getBattleField().drawBattleField();
+                    System.out.println("You missed!");
+                    switchPlayers();
+                }
+                active  =  active.equals(player1) ? player2 : player1;
+                passive = passive.equals(player1) ? player2 : player1;
+            } catch (IllegalArgumentException e) {
+                System.out.println(e.getMessage() + " Try again:");
+            }
+        }
+    }
     private static void placeFleet(BattleField battleField, AbstractBattleship[] fleet) {
         Scanner scanner = new Scanner(System.in);
         Parser parser = new Parser();
         String input;
         for (int i = 0; i < fleet.length; i++) {
             battleField.drawBattleField();
-            System.out.printf("Enter the coordinates of the %s (%d cells):\r\n", fleet[i].getBattleshipType(), fleet[i].length);
+            System.out.println("Enter the coordinates of the " + fleet[i].getBattleshipType() + " (" + fleet[i].length + " cells)");
+            System.out.println();
             boolean stop = false;
             while (!stop) {
                 try {
                     input = scanner.nextLine();
+                    System.out.println();
                     Coordinates[] shipCoords = parser.parseCoordinates(input.toUpperCase());
                     if (shipCoords[0].getX() == shipCoords[1].getX() &&
                         shipCoords[0].getY() > shipCoords[1].getY() ||
@@ -40,10 +116,10 @@ public class Main {
                         fleet[i].setCoordinates(shipCoords[0], shipCoords[1]);
                     }
                     battleField.addBattleShip(fleet[i]);
-//                    battleField.drawBattleField();
                     stop = true;
                 } catch (IllegalArgumentException e) {
                     System.out.println(e.getMessage() + " Try again:");
+                    System.out.println();
                 }
             }
         }
@@ -129,6 +205,9 @@ class Coordinates {
     }
 }
 class BattleField {
+
+    private boolean fogOfWarOn;
+    private ArrayList<AbstractBattleship> fleet;
     private char[][] map;
 
     public BattleField() {
@@ -138,8 +217,25 @@ class BattleField {
                 map[i][j] = '~';
             }
         }
+        fleet = new ArrayList<AbstractBattleship>();
     }
 
+    public boolean isFogOfWarOn() {
+        return fogOfWarOn;
+    }
+
+    public void setFogOfWarOn(boolean isTurnedOn) {
+        fogOfWarOn = isTurnedOn;
+    }
+    public boolean isHit(Coordinates coords) {
+        if (map[coords.getY()][coords.getX()] == 'O' || map[coords.getY()][coords.getX()] == 'X') {
+            map[coords.getY()][coords.getX()] = 'X';
+            return true;
+        } else {
+            map[coords.getY()][coords.getX()] = 'M';
+            return false;
+        }
+    }
     private void addPadding(AbstractBattleship battleship) {
         Coordinates[] coords = battleship.getCoordinates();
         boolean isHorizontal = true;
@@ -186,33 +282,70 @@ class BattleField {
             }
         }
     }
+
     public void addBattleShip(AbstractBattleship battleship) {
         Coordinates[] coords = battleship.getCoordinates();
+        Coordinates[] buffer = new Coordinates[coords.length];
         for (int i = 0; i < coords.length; i++) {
             if (map[coords[i].getY()][coords[i].getX()] == '·') {
                 throw new IllegalArgumentException("Error! Wrong coordinates! Too close to other ship.");
             } else if (map[coords[i].getY()][coords[i].getX()] == 'O') {
                 throw new IllegalArgumentException("Error! Wrong coordinates! Overlapping with other ship.");
             }
-            map[coords[i].getY()][coords[i].getX()] = 'O';
+            buffer[i] = new Coordinates(coords[i].getX(), coords[i].getY());
         }
+        for (int i = 0; i < buffer.length; i++) {
+            map[buffer[i].getY()][buffer[i].getX()] = 'O';
+        }
+        fleet.add(battleship);
         addPadding(battleship);
     }
 
     public void drawBattleField() {
         char[] letters = {'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', };
-        System.out.println("  1 2 3 4 5 6 7 8 9 10");
+        System.out.println("\s\s1 2 3 4 5 6 7 8 9 10");
         for (int i = 0; i < map.length; i++) {
             System.out.print(letters[i]);
             for (int j = 0; j < map[i].length; j++) {
-                if (map[i][j] == '·') {
+                if (map[i][j] == '·' ||
+                    fogOfWarOn && map[i][j] == 'O') {
                     System.out.print(" ~");
+                } else if (map[i][j] == 'X') {
+                    System.out.print(" X");
+                } else if (map[i][j] == 'M') {
+                    System.out.print(" M");
                 } else {
                     System.out.print(" " + map[i][j]);
                 }
             }
-            System.out.print("\r\n");
+            System.out.println();
         }
+        System.out.println();
+    }
+
+    public AbstractBattleship getBattleShipByCoords(Coordinates coords) {
+        for (int i = 0; i < fleet.size(); i++) {
+            for (int j = 0; j < fleet.get(i).getCoordinates().length; j++) {
+                if (fleet.get(i).getCoordinates()[j].getX() == coords.getX() &&
+                        fleet.get(i).getCoordinates()[j].getY() == coords.getY()) {
+                    return fleet.get(i);
+                }
+            }
+        }
+        return null;
+    }
+
+    public boolean isAnyoneAfloat() {
+        for (int i = 0; i < fleet.size(); i++) {
+            if (fleet.get(i).isAfloat(this)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public char getMapSymbol(Coordinates coords) {
+        return map[coords.getY()][coords.getX()];
     }
 }
 abstract class AbstractBattleship {
@@ -269,6 +402,15 @@ abstract class AbstractBattleship {
                 return "Destroyer";
         }
     }
+
+    public boolean isAfloat(BattleField battleField) {
+        for (int i = 0; i < coordinates.length; i++) {
+            if (battleField.getMapSymbol(coordinates[i]) == 'O') {
+                return true;
+            }
+        }
+        return false;
+    }
 }
 
 class AircraftCarrier extends AbstractBattleship {
@@ -303,5 +445,32 @@ class Cruiser extends AbstractBattleship {
 class Destroyer extends AbstractBattleship {
     public Destroyer() {
         super(2);
+    }
+}
+
+class Player {
+
+    String playerName;
+    AbstractBattleship[] fleet;
+    BattleField battleField;
+    public Player(BattleField battleField, String playerName) {
+        this.playerName = playerName;
+        this.battleField = battleField;
+        fleet = new AbstractBattleship[5];
+        fleet[0] = new AircraftCarrier();
+        fleet[1] = new Battleship();
+        fleet[2] = new Submarine();
+        fleet[3] = new Cruiser();
+        fleet[4] = new Destroyer();
+    }
+
+    public String getPlayerName() {
+        return playerName;
+    }
+    public AbstractBattleship[] getFleet() {
+        return fleet;
+    }
+    public BattleField getBattleField() {
+        return battleField;
     }
 }
